@@ -1,0 +1,3 @@
+name: SSMDocs
+runtime: python
+environment: esbpcs/Personal-training/Dev
