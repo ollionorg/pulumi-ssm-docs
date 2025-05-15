@@ -2,6 +2,8 @@
 
 This repository provides a Pulumi-based solution to deploy and manage AWS Systems Manager (SSM) Documents across one or more AWS regions. It includes validation logic to ensure SSM document payloads comply with approved schemas, and automatically shares these documents with specified AWS accounts.
 
+Information and Known issues: https://ollion.atlassian.net/wiki/x/CYA3-w
+
 ---
 
 ## Table of Contents
