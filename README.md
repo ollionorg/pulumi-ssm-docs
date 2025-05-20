@@ -2,7 +2,7 @@
 
 This repository provides a Pulumi-based solution to deploy and manage AWS Systems Manager (SSM) Documents across one or more AWS regions. It includes validation logic to ensure SSM document payloads comply with approved schemas, and automatically shares these documents with specified AWS accounts.
 
-Information and Known issues: https://ollion.atlassian.net/wiki/x/CYA3-w
+Information and Known issues: <https://ollion.atlassian.net/wiki/x/CYA3-w>
 
 ---
 
@@ -17,33 +17,36 @@ Information and Known issues: https://ollion.atlassian.net/wiki/x/CYA3-w
 * [Code Structure](#code-structure)
 * [Testing](#testing)
 * [Contributing](#contributing)
+  * [Adding New SSM Documents](#adding-new-ssm-documents)
 * [License](#license)
 
 ---
 
 ## Overview
 
-This repository is a part of Automation package that deploys AWS Systems Manager (SSM) Documents across multiple AWS regions using Pulumi ESC with OIDC authentication. It adheres to ESC best practices by separating:
+This repository provides a modular, extensible framework for deploying AWS Systems Manager (SSM) Documents across multiple AWS regions using Pulumi ESC with OIDC authentication. The solution follows modern software engineering principles with a clean separation of concerns across multiple components:
 
-* **Environment**: Stacks managed via ESC environments.
-* **Secrets**: Sensitive values stored and retrieved through ESC secret management.
-* **Config**: Declarative settings in `Pulumi.<stack>.yaml` for region selection and account sharing.
+* **Templating**: Standardized document templates with consistent structure and behavior
+* **Validation**: Comprehensive validation against AWS SSM schema requirements
+* **Script Library**: Reusable, cross-platform script templates for common operations
+* **Deployment**: Pulumi component resources for managing multi-region deployments
 
-On each run, the project discovers available AWS regions (with a fallback list), filters them according to `enabled_regions` in your stack YAML, and then instantiates a suite of SSM Documents—ranging from agent installers/upgraders/uninstallers to Linux and Windows user-management utilities. All payload definitions live in `ssm_docs.py` and are validated against AWS SSM schema v2.2 (and earlier) before publishing.
+The project seamlessly integrates with Pulumi ESC by separating:
 
-Documents are automatically shared with any AWS accounts listed under `accountIds`.
+* **Environment**: Stacks managed via ESC environments
+* **Secrets**: Sensitive values stored and retrieved through ESC secret management
+* **Config**: Declarative settings in `Pulumi.<stack>.yaml` for region selection and account sharing
 
-Refer to the ESC examples for end-to-end workflows: [https://github.com/pulumi/esc-examples](https://github.com/pulumi/esc-examples)
+On each run, the project deploys a suite of SSM Documents—ranging from agent management to user administration tools—to your configured regions, sharing them with specified AWS accounts.
 
 ## Prerequisites
 
 * **Pulumi CLI** (v3.x)
-* **Python** >= 3.7
+* **Python** >= 3.7
 * **AWS Credentials** configured locally (via `~/.aws/credentials`, environment variables, or IAM role)
-* **AWS OIDC Provider** configured for Pulumi ESC:
+* **AWS OIDC Provider** configured for Pulumi ESC
 
-  * Create an AWS IAM OIDC identity provider for your ESC OIDC issuer and configure trust policies. See AWS docs: [https://docs.aws.amazon.com/IAM/latest/UserGuide/id\_roles\_providers\_create\_oidc.html](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html)
-  * Follow Pulumi ESC AWS OIDC setup guide: [https://www.pulumi.com/docs/esc/environments/configuring-oidc/aws/](https://www.pulumi.com/docs/esc/environments/configuring-oidc/aws/)
+This repository includes a CloudFormation template (`CloudFormation template/Pulumi-OIDC.yaml`) to quickly set up the required AWS OIDC integration for Pulumi ESC, which you can deploy via the AWS Console or CLI.
 
 ## Installation
 
@@ -52,30 +55,19 @@ Refer to the ESC examples for end-to-end workflows: [https://github.com/pulumi/e
    ```bash
    git clone <repo-url> && cd <repo-dir>
    ```
+
 2. **Install Python dependencies**:
 
    ```bash
    pip install --upgrade pip
    pip install -r requirements.txt
    ```
-3. **Log in once to Pulumi ESC with OIDC** (if not already authenticated):
+
+3. **Log in to Pulumi ESC**:
 
    ```bash
-   pulumi login pulumi-esc://<your-esc-endpoint> --oidc
+   pulumi esc login
    ```
-4. **Setup ESC environment, secrets, and config**:
-
-   * **Environment**: Create or select your ESC environment:
-
-     ```bash
-     esc env create <org>/<project>/<stack>
-     ```
-   * **Secrets**: Add sensitive values:
-
-     ```bash
-     esc secret set <org>/<project>/<stack>:<key> <value>
-     ```
-   * **Config**: Define declarative settings in `Pulumi.<stack>.yaml` under `config:` (see next section).
 
 ## Configuration
 
@@ -86,81 +78,86 @@ config:
   enabled_regions:
     - us-east-1
     - eu-central-1
-    - ap-southeast-1
     - ap-southeast-2
 
   accountIds:
     - "1234567890"
 ```
 
-Secrets can be flagged alongside values or stored via `esc secret set` and referenced here as needed.
+**Important configuration details:**
+
+* The **default region** is determined by your Pulumi/AWS environment settings and is where the Pulumi program runs
+* The **enabled_regions** list specifies all AWS regions where the SSM documents will be deployed
+* The **accountIds** list contains AWS account IDs that the documents will be shared with (in addition to the account where they're being deployed)
+
+For example, if your Pulumi is running in account `987654321` and you've specified the configuration above:
+
+1. SSM documents will be deployed to `us-east-1`, `eu-central-1`, and `ap-southeast-2` in account `987654321`
+2. Each document will be shared with account `1234567890`, allowing that account to use the documents without creating its own copies
+
+Secrets can be managed using `pulumi env set` and referenced in your configuration as needed.
 
 ## Usage
 
 Deploy all configured SSM Documents:
 
 ```bash
-pulumi up
-```
+# List current environment
+pulumi env ls
 
-Or, using Pulumi ESC:
-
-```bash
-esc run <org>/<project>/<stack> -- pulumi up --yes
+# Run in selected environment
+pulumi env run <environment-name> -- pulumi up --yes
 ```
 
 Destroy all deployed resources:
 
 ```bash
-pulumi destroy
-```
-
-Or via Pulumi ESC:
-
-```bash
-esc run <org>/<project>/<stack> -- pulumi destroy --yes
+pulumi env run <environment-name> -- pulumi destroy --yes
 ```
 
 ## SSM Documents Provided
 
-The following SSM Documents are automatically created in every region listed under `enabled_regions`. Each name includes a region-specific `<code>` suffix (e.g., `apse1` for `ap-southeast-1`).
+The following SSM Documents are automatically created in every region listed under `enabled_regions`. Each name includes a region-specific `<code>` suffix (e.g., `apse2` for `ap-southeast-2`).
 
-| Document Name                                   | Description                                                    | Parameters                                                                                                                                                        |
-| ----------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NewRelic-Agent-Install-<code>`                 | Install & configure the New Relic Infrastructure Agent.        | None                                                                                                                                                              |
-| `NewRelic-Agent-Upgrade-<code>`                 | Upgrade New Relic Infrastructure Agent (Linux & Windows).      | None                                                                                                                                                              |
-| `NewRelic-Agent-Uninstall-<code>`               | Remove New Relic Infrastructure Agent.                         | None                                                                                                                                                              |
-| `Upgrade-Agent-GCP-<code>`                      | Upgrade New Relic & Google guest agents (Linux & Windows).     | None                                                                                                                                                              |
-| `Zabbix-Agent-Uninstall-<code>`                 | Remove Zabbix Agent (Linux & Windows).                         | None                                                                                                                                                              |
-| `TrendMicroDeepSecurity-Agent-Uninstall-<code>` | Remove Trend Micro Deep-Security Agent.                        | `password` (String): Self-protect password.                                                                                                                       |
-| `Create-Local-User-Windows-<code>`              | Create a local Windows user (logs password in output).         | `username` (String)<br>`fullName` (String, optional)<br>`userDescription` (String)<br>`group` (String).                                                           |
-| `Reset-Local-User-Passwords-Windows-<code>`     | Reset Windows local-user passwords (logs new passwords).       | `userNames` (String): Comma-separated list of Windows usernames.                                                                                                  |
-| `Check-Local-User-Expiration-Windows-<code>`    | Report Windows local-user password expiry.                     | None                                                                                                                                                              |
-| `Create-Local-User-Linux-<code>`                | Create a Linux user and store its password in Parameter Store. | `username` (String)<br>`group` (String, optional)<br>`parameterPrefix` (String)<br>`expirationHours` (String).                                                    |
-| `Delete-Local-Users-Linux-<code>`               | Remove one or more Linux users.                                | `usernames` (String): Comma-separated list<br>`deleteHome` (String): `true`/`false`.                                                                              |
-| `Create-Passwordless-User-Linux-<code>`         | Create Linux user with SSH key + sudo NOPASSWD (stores key).   | `username` (String)<br>`secondaryGroup` (String, optional)<br>`parameterPrefix` (String)<br>`expirationHours` (String)<br>`keyType` (String): `ed25519` or `rsa`. |
-| `Upgrade-Packages-Linux-<code>`                 | Upgrade specific packages (latest or security-only).           | `packages` (String): Comma-separated list<br>`updateType` (String): `latest`/`security`<br>`cves` (String, optional).                                             |
-| `Disk-Cleanup-Windows-<code>`                   | Automated disk cleanup & component cleanup on Windows.         | None                                                                                                                                                              |
+| Document Name                                | Description                                                    | Parameters                                                                                                                                                         |
+| -------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NewRelic-Agent-Install-<code>`              | Install & configure the New Relic Infrastructure Agent         | `apiKey`, `accountId`, `region`, `displayName`, `enableLogForwarding`, `enableProcessMetrics`                                                                      |
+| `NewRelic-Agent-Upgrade-<code>`              | Upgrade New Relic Infrastructure Agent (Linux & Windows)       | None                                                                                                                                                               |
+| `NewRelic-Agent-Uninstall-<code>`            | Remove New Relic Infrastructure Agent                          | None                                                                                                                                                               |
+| `Create-Local-User-Windows-<code>`           | Create a local Windows user with secure random password        | `username`, `fullName`, `userDescription`, `group`                                                                                                                 |
+| `Reset-Local-User-Passwords-Windows-<code>`  | Reset Windows local-user passwords (logs new passwords)        | `userNames`: Comma-separated list of Windows usernames                                                                                                             |
+| `Check-Local-User-Expiration-Windows-<code>` | Report Windows local-user password expiry                      | None                                                                                                                                                               |
+| `Create-Local-User-Linux-<code>`             | Create a Linux user and store password in Parameter Store      | `username`, `group`, `parameterPrefix`, `expirationHours`                                                                                                          |
+| `Delete-Local-Users-Linux-<code>`            | Remove one or more Linux users                                 | `usernames`: Comma-separated list, `deleteHome`: `true`/`false`                                                                                                    |
+| `Create-Passwordless-User-Linux-<code>`      | Create Linux user with SSH key + sudo NOPASSWD                 | `username`, `secondaryGroup`, `parameterPrefix`, `expirationHours`, `keyType`: `ed25519`/`rsa`                                                                     |
+| `Upgrade-Packages-Linux-<code>`              | Upgrade specific packages (latest or security-only)            | `packages`: Comma-separated list, `updateType`: `latest`/`security`, `cves`: Comma-separated CVE IDs                                                               |
+| `Disk-Cleanup-Windows-<code>`                | Automated disk cleanup & component cleanup on Windows          | None                                                                                                                                                               |
+| `Check-Local-User-Expiration-Linux-<code>`   | List Linux local users & password expiry                       | `excludedUsers`: Comma-separated list, `minimumUid`: Minimum UID to check                                                                                          |
 
 ## Code Structure
 
 ```text
-├── __main__.py         # Entry point: discovers/filter regions, instantiates SsmDocs component per region
-├── ssm_docs.py         # Defines SsmDocs component and validation logic for SSM Document payloads
-├── requirements.txt    # Python dependencies
-└── Pulumi.<stack>.yaml  # Stack configuration: enabled_regions, accountIds, imports, values, and secrets
-└── CloudFormation template  # Deployable OIDC role template
+├── __main__.py                # Entry point: orchestrates multi-region deployment
+├── validator.py               # SSM Document validation logic
+├── script_library.py          # Reusable script templates for documents
+├── document_templates.py      # Standardized SSM document payload definitions
+├── ssm_component.py           # Pulumi component for SSM document deployment
+├── CloudFormation template/   # Templates for infrastructure setup
+│   └── Pulumi-OIDC.yaml       # CloudFormation template for AWS OIDC setup
+├── requirements.txt           # Python dependencies
+└── Pulumi.<stack>.yaml        # Stack configuration: enabled_regions, accountIds
 ```
 
 ## Testing
 
-There are currently no automated test suites included. To validate changes:
+To validate changes:
 
 * Run a Pulumi dry run:
 
   ```bash
   pulumi preview  # or pulumi up --dry-run
   ```
+
 * Ensure SSM document payloads pass schema validation during the run.
 
 ## Contributing
@@ -173,26 +170,115 @@ We welcome contributions! Please follow these guidelines:
    ```bash
    git checkout -b feature/your-feature
    ```
+
 3. Implement your changes and update documentation as needed.
 4. Commit with a descriptive message:
 
    ```bash
    git commit -m "feat: add new SSM document for X"
    ```
+
 5. Push your branch to your fork:
 
    ```bash
    git push origin feature/your-feature
    ```
+
 6. Open a Pull Request against the `main` branch, describing your changes.
 
-**Before submitting:**
+### Adding New SSM Documents
 
-* Run a Pulumi preview to validate your changes:
+To add a new SSM document to the deployment, follow these steps:
 
-  ```bash
-  pulumi preview
-  ```
+1. **Create Script Templates (if needed)**
+   * Open `script_library.py`
+   * Add a new static method to the `SsmScriptLibrary` class with your script content
+   * Ensure your script handles different OS versions and includes proper error handling
+   * Example:
+
+     ```python
+     @staticmethod
+     def my_new_script() -> List[str]:
+         """
+         Description of what this script does.
+         
+         Returns:
+             List[str]: Script commands as a line-by-line list
+         """
+         return [
+             "#!/usr/bin/env bash",
+             "set -euo pipefail",
+             "# Your script commands here",
+             "echo 'Hello from my new script'",
+         ]
+     ```
+
+2. **Define Document Template**
+   * Open `document_templates.py`
+   * Add a new static method to the `SsmDocumentTemplates` class
+   * Create your document payload with appropriate schema, parameters and steps
+   * Reference your script template from `SsmScriptLibrary` if needed
+   * Example:
+
+     ```python
+     @staticmethod
+     def my_new_document() -> Dict[str, Any]:
+         """
+         Create an SSM document for my new operation.
+         
+         Description of what this document does.
+         
+         Returns:
+             Dict[str, Any]: A complete SSM document template as a dictionary
+         """
+         return {
+             "schemaVersion": "2.2",
+             "description": "My new SSM document",
+             "parameters": {
+                 "myParam": {
+                     "type": "String",
+                     "description": "Description of parameter"
+                 }
+             },
+             "mainSteps": [
+                 {
+                     "name": "RunMyScript",
+                     "action": "aws:runShellScript",
+                     "precondition": {"StringEquals": ["platformType", "Linux"]},
+                     "inputs": {
+                         "timeoutSeconds": 300,
+                         "runCommand": SsmScriptLibrary.my_new_script()
+                     }
+                 }
+             ]
+         }
+     ```
+
+3. **Register Document in Component**
+   * Open `ssm_component.py`
+   * Find the `_create_documents` method in the `SsmDocs` class
+   * Add your document to the `document_templates` list:
+
+     ```python
+     document_templates = [
+         # Existing documents...
+         ("My-New-Document", SsmDocumentTemplates.my_new_document),
+     ]
+     ```
+
+4. **Update Documentation**
+   * Add your document to the SSM Documents table in this README.md:
+
+     ```markdown
+     | `My-New-Document-<code>` | Description of what your document does | `myParam`: Description of parameter |
+     ```
+
+5. **Test Your Addition**
+   * Run `pulumi preview` to ensure your document passes validation
+   * Check for any issues in the validator output
+   * Test the deployed document in AWS if possible
+
+Your new SSM document will now be automatically deployed to all configured regions along with the existing documents.
 
 ## License
 
