@@ -314,6 +314,7 @@ def validate_shell_script(step, step_name, errors, warnings):
             f"Best practice: Add error handling (set -e) to shell script in step '{step_name}'"
         )
 
+
 def validate_powershell_script(step, step_name, errors, warnings):
     """Validate PowerShell script steps"""
     if "runCommand" not in step["inputs"]:

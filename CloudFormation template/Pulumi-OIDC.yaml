@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  CloudFormation template to set up AWS IAM OIDC Provider and IAM Role for Pulumi ESC,
+  with AdministratorAccess policy.
+
+Parameters:
+  OIDCProviderUrl:
+    Type: String
+    Description: The OIDC provider URL.
+    Default: "https://api.pulumi.com/oidc"
+  OIDCClientId:
+    Type: String
+    Description: The OIDC Client ID (audience) i.e. Pulumi Organization Name.
+    Default: "aws:esbpcs"
+  PulumiRoleName:
+    Type: String
+    Description: The name of the IAM role to be assumed by Pulumi ESC.
+    Default: "PulumiESCProviderRole"
+  AllowedPulumiOrg:
+    Type: String
+    Description: The Pulumi ESC organization allowed to assume the role.
+    Default: "esbpcs"
+
+Resources:
+  PulumiOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: !Ref OIDCProviderUrl
+      ClientIdList:
+        - !Ref OIDCClientId
+      Tags:
+        - Key: Maintainer
+          Value: Elang
+
+  PulumiESCProviderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref PulumiRoleName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !GetAtt PulumiOIDCProvider.Arn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "api.pulumi.com/oidc:aud": !Sub "aws:${AllowedPulumiOrg}"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      Tags:
+        - Key: Maintainer
+          Value: Elang
+
+Outputs:
+  RoleArn:
+    Description: The ARN of the IAM Role assumed by Pulumi ESC.
+    Value: !GetAtt PulumiESCProviderRole.Arn
+  OIDCProviderArn:
+    Description: The ARN of the OIDC Provider.
+    Value: !GetAtt PulumiOIDCProvider.Arn

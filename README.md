@@ -149,6 +149,7 @@ The following SSM Documents are automatically created in every region listed und
 ├── ssm_docs.py         # Defines SsmDocs component and validation logic for SSM Document payloads
 ├── requirements.txt    # Python dependencies
 └── Pulumi.<stack>.yaml  # Stack configuration: enabled_regions, accountIds, imports, values, and secrets
+└── CloudFormation template  # Deployable OIDC role template
 ```
 
 ## Testing
