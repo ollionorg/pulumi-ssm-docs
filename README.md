@@ -41,7 +41,8 @@ On each run, the project deploys a suite of SSM Documents—ranging from agent m
 
 ## Prerequisites
 
-* **Pulumi CLI** (v3.x)
+* **Pulumi CLI** <https://www.pulumi.com/docs/iac/download-install/>
+* **ESC CLI** <https://www.pulumi.com/docs/esc/download-install/>
 * **Python** >= 3.7
 * **AWS Credentials** configured locally (via `~/.aws/credentials`, environment variables, or IAM role)
 * **AWS OIDC Provider** configured for Pulumi ESC
@@ -66,7 +67,7 @@ This repository includes a CloudFormation template (`CloudFormation template/Pul
 3. **Log in to Pulumi ESC**:
 
    ```bash
-   pulumi esc login
+   esc login
    ```
 
 ## Configuration
